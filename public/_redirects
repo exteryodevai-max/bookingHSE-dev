@@ -1,0 +1,8 @@
+# Netlify redirects for SPA routing
+# This ensures that all routes are handled by the React app
+
+# API routes (if any)
+/api/*  /.netlify/functions/:splat  200
+
+# All other routes should serve the index.html for SPA routing
+/*    /index.html   200

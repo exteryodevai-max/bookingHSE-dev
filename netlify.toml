@@ -1,0 +1,72 @@
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+[build.environment]
+  NODE_ENV = "production"
+  NODE_VERSION = "18.20.0"
+  NPM_VERSION = "10.2.0"
+  RESEND_API_KEY = "your_resend_api_key_here"
+
+# Production context: all deploys from the Production branch
+[context.production.environment]
+  VITE_APP_URL = "https://bookinghse.com"
+  VITE_APP_NAME = "BookingHSE"
+  NODE_ENV = "production"
+  VITE_SUPABASE_URL = "https://bookinghse.exteryo.com"
+  VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTc2NDMzODMzMSwiZXhwIjoxNzk1ODc0MzMxfQ.sTDng5iJxBKn8QcJ5ikeF7GPwSzj3Chm2wyhelFMwRI"
+  VITE_AUTH_CALLBACK_URL = "https://bookinghse.com/auth/callback"
+  VITE_LOGIN_REDIRECT_URL = "https://bookinghse.com/dashboard"
+  VITE_LOGOUT_REDIRECT_URL = "https://bookinghse.com"
+  VITE_EMAIL_CONFIRM_URL = "https://bookinghse.com/auth/confirm"
+  VITE_PASSWORD_RESET_URL = "https://bookinghse.com/auth/reset-password"
+
+# Deploy Preview context: for pull/merge request previews
+[context.deploy-preview.environment]
+  VITE_APP_URL = "https://deploy-preview-$REVIEW_ID--booking-hse.netlify.app"
+  VITE_APP_NAME = "BookingHSE (Preview)"
+  NODE_ENV = "development"
+
+# Branch Deploy context: for branch deploys
+[context.branch-deploy.environment]
+  VITE_APP_URL = "https://$BRANCH--booking-hse.netlify.app"
+  VITE_APP_NAME = "BookingHSE (Branch)"
+  NODE_ENV = "development"
+
+# Redirect from old Netlify domain to new custom domain
+[[redirects]]
+  from = "https://booking-hse.netlify.app/*"
+  to = "https://bookinghse.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"

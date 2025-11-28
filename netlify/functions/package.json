@@ -1,0 +1,22 @@
+{
+  "name": "netlify-functions-contact",
+  "version": "1.0.0",
+  "description": "Netlify Function per gestire l'invio di email di contatto",
+  "main": "contact.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "resend": "^6.1.2"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "netlify",
+    "functions",
+    "contact",
+    "email",
+    "resend"
+  ],
+  "author": "BookingHSE Team",
+  "license": "MIT"
+}
