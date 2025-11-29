@@ -1,21 +1,24 @@
-import { createClient } from '@supabase/supabase-js';
+// PostgREST client - replaces Supabase
+import { postgrest, supabase as postgrestClient, setAuthToken, getAuthToken, rpc } from './postgrest';
 import type { Database } from './database.types';
-import { 
-  parseSupabaseError, 
-  withErrorHandling, 
+import {
+  parseSupabaseError,
+  withErrorHandling,
   withRetry,
   SupabaseErrorClass,
-  RETRY_CONFIGS 
+  RETRY_CONFIGS
 } from './errors';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+  throw new Error('Missing API environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)');
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// Export postgrest client as supabase for backwards compatibility
+export const supabase = postgrestClient;
+export { setAuthToken, getAuthToken, rpc };
 
 // Database helper functions
 export const db = {

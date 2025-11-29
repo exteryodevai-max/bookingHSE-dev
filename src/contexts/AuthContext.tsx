@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, setAuthToken, getAuthToken, rpc } from '../lib/supabase';
 import type { Database } from '../lib/database.types';
 import type { User, ClientProfile, ProviderProfile } from '../types';
 import toast from 'react-hot-toast';
@@ -646,15 +646,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: { message: 'Password obbligatoria' } };
       }
       
-      // Use custom RPC login instead of Supabase Auth
-      const { data, error: signInError } = await supabase.rpc('login', {
+      // Use direct RPC call to PostgreSQL login function
+      const { data, error: signInError } = await rpc('login', {
         p_email: email,
         p_password: password
-      }) as { data: any; error: any };
+      });
 
       // Save JWT token for authenticated requests
       if (data?.access_token && !signInError) {
-        localStorage.setItem('sb-access-token', data.access_token);
+        setAuthToken(data.access_token);
         localStorage.setItem('sb-user-id', data.user.id);
       }
 
