@@ -1,4 +1,4 @@
--- BookingHSE Database Schema
+﻿-- BookingHSE Database Schema
 -- Supabase PostgreSQL Database
 
 -- Enable necessary extensions
@@ -87,7 +87,6 @@ CREATE TABLE provider_profiles (
   professional_order VARCHAR(100),
   registration_number VARCHAR(100),
   phone VARCHAR(50),
-  website VARCHAR(255),
   description TEXT,
   experience_years INTEGER DEFAULT 0,
   team_size INTEGER DEFAULT 1,

@@ -6,8 +6,7 @@ import {
   CheckBadgeIcon,
   PhoneIcon,
   EnvelopeIcon,
-  GlobeAltIcon,
-  AcademicCapIcon,
+    AcademicCapIcon,
   ClockIcon,
   UserGroupIcon
 } from '@heroicons/react/24/solid';
@@ -145,20 +144,6 @@ export default function ProviderDetailPage() {
                     <EnvelopeIcon className="h-5 w-5 mr-2" />
                     {profile.contact_person?.email}
                   </div>
-                  
-                  {profile.website && (
-                    <div className="flex items-center text-gray-600">
-                      <GlobeAltIcon className="h-5 w-5 mr-2" />
-                      <a 
-                        href={profile.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-700"
-                      >
-                        Sito web
-                      </a>
-                    </div>
-                  )}
                 </div>
 
                 <div className="space-y-3">

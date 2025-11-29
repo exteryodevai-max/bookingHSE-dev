@@ -1,4 +1,4 @@
-// Tipizzazioni database Supabase per BookingHSE
+﻿// Tipizzazioni database Supabase per BookingHSE
 export type Json =
   | string
   | number
@@ -162,7 +162,6 @@ export interface Database {
           professional_order?: string
           registration_number?: string
           phone?: string
-          website?: string
           description?: string
           experience_years?: number
           team_size?: number
@@ -210,7 +209,6 @@ export interface Database {
           professional_order?: string
           registration_number?: string
           phone?: string
-          website?: string
           description?: string
           experience_years?: number
           team_size?: number
@@ -258,7 +256,6 @@ export interface Database {
           professional_order?: string
           registration_number?: string
           phone?: string
-          website?: string
           description?: string
           experience_years?: number
           team_size?: number

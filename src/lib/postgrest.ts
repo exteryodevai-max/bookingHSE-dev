@@ -4,7 +4,6 @@
  */
 
 const API_URL = import.meta.env.VITE_SUPABASE_URL;
-const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Token management
 let currentToken: string | null = null;
@@ -28,17 +27,20 @@ const apiFetch = async (
   endpoint: string,
   options: RequestInit = {}
 ): Promise<Response> => {
-  const token = getAuthToken() || ANON_KEY;
+  const token = getAuthToken();
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'Authorization': `Bearer ${token}`,
-    'apikey': ANON_KEY,
     ...options.headers,
   };
 
-  const response = await fetch(`${API_URL}/rest/v1${endpoint}`, {
+  // Only add Authorization header if we have a valid JWT token (contains dots)
+  if (token && token.includes('.')) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
   });
@@ -47,10 +49,10 @@ const apiFetch = async (
 };
 
 // RPC function calls
-export const rpc = async <T = any>(
+export const rpc = async <T = unknown>(
   functionName: string,
-  params: Record<string, any> = {}
-): Promise<{ data: T | null; error: any }> => {
+  params: Record<string, unknown> = {}
+): Promise<{ data: T | null; error: unknown }> => {
   try {
     const response = await apiFetch(`/rpc/${functionName}`, {
       method: 'POST',
@@ -70,7 +72,7 @@ export const rpc = async <T = any>(
 };
 
 // Query builder class
-class QueryBuilder<T = any> {
+class QueryBuilder<T = unknown> {
   private table: string;
   private selectColumns: string = '*';
   private filters: string[] = [];
@@ -89,33 +91,33 @@ class QueryBuilder<T = any> {
     return this;
   }
 
-  eq(column: string, value: any): this {
-    this.filters.push(`${column}=eq.${encodeURIComponent(value)}`);
+  eq(column: string, value: unknown): this {
+    this.filters.push(`${column}=eq.${encodeURIComponent(String(value))}`);
     return this;
   }
 
-  neq(column: string, value: any): this {
-    this.filters.push(`${column}=neq.${encodeURIComponent(value)}`);
+  neq(column: string, value: unknown): this {
+    this.filters.push(`${column}=neq.${encodeURIComponent(String(value))}`);
     return this;
   }
 
-  gt(column: string, value: any): this {
-    this.filters.push(`${column}=gt.${encodeURIComponent(value)}`);
+  gt(column: string, value: unknown): this {
+    this.filters.push(`${column}=gt.${encodeURIComponent(String(value))}`);
     return this;
   }
 
-  gte(column: string, value: any): this {
-    this.filters.push(`${column}=gte.${encodeURIComponent(value)}`);
+  gte(column: string, value: unknown): this {
+    this.filters.push(`${column}=gte.${encodeURIComponent(String(value))}`);
     return this;
   }
 
-  lt(column: string, value: any): this {
-    this.filters.push(`${column}=lt.${encodeURIComponent(value)}`);
+  lt(column: string, value: unknown): this {
+    this.filters.push(`${column}=lt.${encodeURIComponent(String(value))}`);
     return this;
   }
 
-  lte(column: string, value: any): this {
-    this.filters.push(`${column}=lte.${encodeURIComponent(value)}`);
+  lte(column: string, value: unknown): this {
+    this.filters.push(`${column}=lte.${encodeURIComponent(String(value))}`);
     return this;
   }
 
@@ -129,17 +131,17 @@ class QueryBuilder<T = any> {
     return this;
   }
 
-  in(column: string, values: any[]): this {
-    this.filters.push(`${column}=in.(${values.map(v => encodeURIComponent(v)).join(',')})`);
+  in(column: string, values: unknown[]): this {
+    this.filters.push(`${column}=in.(${values.map(v => encodeURIComponent(String(v))).join(',')})`);
     return this;
   }
 
-  contains(column: string, value: any[]): this {
+  contains(column: string, value: unknown[]): this {
     this.filters.push(`${column}=cs.{${value.join(',')}}`);
     return this;
   }
 
-  overlaps(column: string, value: any[]): this {
+  overlaps(column: string, value: unknown[]): this {
     this.filters.push(`${column}=ov.{${value.join(',')}}`);
     return this;
   }
@@ -202,7 +204,7 @@ class QueryBuilder<T = any> {
     return params.length > 0 ? `?${params.join('&')}` : '';
   }
 
-  async execute(): Promise<{ data: T | T[] | null; error: any }> {
+  async execute(): Promise<{ data: T | T[] | null; error: unknown }> {
     try {
       const queryString = this.buildQueryString();
       const response = await apiFetch(`/${this.table}${queryString}`);
@@ -224,29 +226,28 @@ class QueryBuilder<T = any> {
     }
   }
 
-  // Alias for execute to maintain compatibility
-  then<TResult1 = { data: T | T[] | null; error: any }, TResult2 = never>(
-    onfulfilled?: ((value: { data: T | T[] | null; error: any }) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+  then<TResult1 = { data: T | T[] | null; error: unknown }, TResult2 = never>(
+    onfulfilled?: ((value: { data: T | T[] | null; error: unknown }) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): Promise<TResult1 | TResult2> {
     return this.execute().then(onfulfilled, onrejected);
   }
 }
 
 // Insert builder
-class InsertBuilder<T = any> {
+class InsertBuilder<T = unknown> {
   private table: string;
-  private data: any;
+  private data: unknown;
   private returnData: boolean = false;
   private singleResult: boolean = false;
   private maybeSingleResult: boolean = false;
 
-  constructor(table: string, data: any) {
+  constructor(table: string, data: unknown) {
     this.table = table;
     this.data = data;
   }
 
-  select(columns: string = '*'): this {
+  select(): this {
     this.returnData = true;
     return this;
   }
@@ -261,7 +262,7 @@ class InsertBuilder<T = any> {
     return this;
   }
 
-  async execute(): Promise<{ data: T | null; error: any }> {
+  async execute(): Promise<{ data: T | null; error: unknown }> {
     try {
       const headers: HeadersInit = {};
       if (this.returnData) {
@@ -295,34 +296,34 @@ class InsertBuilder<T = any> {
     }
   }
 
-  then<TResult1 = { data: T | null; error: any }, TResult2 = never>(
-    onfulfilled?: ((value: { data: T | null; error: any }) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+  then<TResult1 = { data: T | null; error: unknown }, TResult2 = never>(
+    onfulfilled?: ((value: { data: T | null; error: unknown }) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): Promise<TResult1 | TResult2> {
     return this.execute().then(onfulfilled, onrejected);
   }
 }
 
 // Update builder
-class UpdateBuilder<T = any> {
+class UpdateBuilder<T = unknown> {
   private table: string;
-  private data: any;
+  private data: unknown;
   private filters: string[] = [];
   private returnData: boolean = false;
   private singleResult: boolean = false;
   private maybeSingleResult: boolean = false;
 
-  constructor(table: string, data: any) {
+  constructor(table: string, data: unknown) {
     this.table = table;
     this.data = data;
   }
 
-  eq(column: string, value: any): this {
-    this.filters.push(`${column}=eq.${encodeURIComponent(value)}`);
+  eq(column: string, value: unknown): this {
+    this.filters.push(`${column}=eq.${encodeURIComponent(String(value))}`);
     return this;
   }
 
-  select(columns: string = '*'): this {
+  select(): this {
     this.returnData = true;
     return this;
   }
@@ -337,7 +338,7 @@ class UpdateBuilder<T = any> {
     return this;
   }
 
-  async execute(): Promise<{ data: T | null; error: any }> {
+  async execute(): Promise<{ data: T | null; error: unknown }> {
     try {
       const queryString = this.filters.length > 0 ? `?${this.filters.join('&')}` : '';
       const headers: HeadersInit = {};
@@ -372,9 +373,9 @@ class UpdateBuilder<T = any> {
     }
   }
 
-  then<TResult1 = { data: T | null; error: any }, TResult2 = never>(
-    onfulfilled?: ((value: { data: T | null; error: any }) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+  then<TResult1 = { data: T | null; error: unknown }, TResult2 = never>(
+    onfulfilled?: ((value: { data: T | null; error: unknown }) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): Promise<TResult1 | TResult2> {
     return this.execute().then(onfulfilled, onrejected);
   }
@@ -389,12 +390,12 @@ class DeleteBuilder {
     this.table = table;
   }
 
-  eq(column: string, value: any): this {
-    this.filters.push(`${column}=eq.${encodeURIComponent(value)}`);
+  eq(column: string, value: unknown): this {
+    this.filters.push(`${column}=eq.${encodeURIComponent(String(value))}`);
     return this;
   }
 
-  async execute(): Promise<{ error: any }> {
+  async execute(): Promise<{ error: unknown }> {
     try {
       const queryString = this.filters.length > 0 ? `?${this.filters.join('&')}` : '';
 
@@ -413,9 +414,9 @@ class DeleteBuilder {
     }
   }
 
-  then<TResult1 = { error: any }, TResult2 = never>(
-    onfulfilled?: ((value: { error: any }) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+  then<TResult1 = { error: unknown }, TResult2 = never>(
+    onfulfilled?: ((value: { error: unknown }) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): Promise<TResult1 | TResult2> {
     return this.execute().then(onfulfilled, onrejected);
   }
@@ -424,8 +425,8 @@ class DeleteBuilder {
 // Table interface (mimics Supabase client)
 const createTableInterface = (tableName: string) => ({
   select: (columns: string = '*') => new QueryBuilder(tableName).select(columns),
-  insert: (data: any) => new InsertBuilder(tableName, data),
-  update: (data: any) => new UpdateBuilder(tableName, data),
+  insert: (data: unknown) => new InsertBuilder(tableName, data),
+  update: (data: unknown) => new UpdateBuilder(tableName, data),
   delete: () => new DeleteBuilder(tableName),
 });
 
@@ -441,7 +442,6 @@ export const postgrest = {
       if (!token) {
         return { data: { session: null }, error: null };
       }
-      // Decode JWT to get user info
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         return {
@@ -487,8 +487,7 @@ export const postgrest = {
       localStorage.removeItem('sb-user-id');
       return { error: null };
     },
-    onAuthStateChange: (callback: (event: string, session: any) => void) => {
-      // No-op for now, can be implemented with custom events if needed
+    onAuthStateChange: () => {
       return { data: { subscription: { unsubscribe: () => {} } } };
     }
   }

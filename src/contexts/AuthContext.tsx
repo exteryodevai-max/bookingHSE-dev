@@ -85,7 +85,6 @@ function convertDatabaseProfileToUserProfile(
         phone: providerProfile.contact_person_phone || ''
       },
       phone: providerProfile.phone || '',
-      website: providerProfile.website || '',
       description: providerProfile.description || '',
       specializations: providerProfile.specializations || [],
       certifications: [],
@@ -172,7 +171,6 @@ function createEmptyProfile(userType: 'client' | 'provider'): ClientProfile | Pr
         phone: ''
       },
       phone: '',
-      website: '',
       description: '',
       specializations: [],
       certifications: [],
@@ -398,7 +396,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 business_name: finalUserData.company_name || 'Azienda',
                 vat_number: '',
                 fiscal_code: '',
-                website: '',
                 description: '',
                 experience_years: 0,
                 team_size: 1,
@@ -785,7 +782,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             contact_person_email: providerData.contact_person.email,
             contact_person_phone: providerData.contact_person.phone,
             phone: providerData.phone,
-            website: providerData.website,
             description: providerData.description,
             specializations: providerData.specializations,
             service_areas: providerData.service_areas,

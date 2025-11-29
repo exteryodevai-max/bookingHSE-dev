@@ -85,8 +85,7 @@ const providerGeneralSchema = yup.object({
   professional_order: yup.string().nullable(),
   registration_number: yup.string().nullable(),
   experience_years: yup.number().min(0, 'Anni esperienza non validi').required('Anni esperienza obbligatori'),
-  team_size: yup.number().min(1, 'Dimensione team deve essere almeno 1').required('Dimensione team obbligatoria'),
-  website: yup.string().url('URL non valido').nullable()
+  team_size: yup.number().min(1, 'Dimensione team deve essere almeno 1').required('Dimensione team obbligatoria')
 });
 
 const providerAddressSchema = yup.object({
@@ -167,7 +166,6 @@ export default function Profile() {
     } : {
       business_name: '',
       description: '',
-      website: '',
       address: {
         street: '',
         city: '',
@@ -279,8 +277,7 @@ export default function Profile() {
               professional_order: formData.professional_order,
               registration_number: formData.registration_number,
               experience_years: formData.experience_years,
-              team_size: formData.team_size,
-              website: formData.website
+              team_size: formData.team_size
             };
             break;
           case 'address':
@@ -477,7 +474,6 @@ export default function Profile() {
             reset({
               business_name: '',
               description: '',
-              website: '',
               address: {
                 street: '',
                 city: '',
@@ -756,7 +752,6 @@ export default function Profile() {
                           <p className="mt-1 text-sm text-red-600">{errors.employees_count.message}</p>
                         )}
                       </div>
-
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
                           Sito Web
@@ -828,20 +823,6 @@ export default function Profile() {
                         />
                         {errors.team_size && (
                           <p className="mt-1 text-sm text-red-600">{errors.team_size.message}</p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Sito Web
-                        </label>
-                        <input
-                          type="url"
-                          {...register('website')}
-                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        {errors.website && (
-                          <p className="mt-1 text-sm text-red-600">{errors.website.message}</p>
                         )}
                       </div>
                     </>

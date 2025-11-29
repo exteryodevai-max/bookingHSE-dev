@@ -37,7 +37,6 @@ export interface ProviderProfile {
   address: Address;
   contact_person: ContactPerson;
   phone: string;
-  website?: string;
   description: string;
   specializations: string[];
   certifications: Certification[];
