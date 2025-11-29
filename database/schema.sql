@@ -337,6 +337,38 @@ CREATE INDEX idx_reviews_reviewed_id ON reviews(reviewed_id);
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_read ON notifications(read);
 
+-- Performance indexes for search (partial indexes for active services)
+CREATE INDEX idx_services_category_active ON services(category) WHERE active = true;
+CREATE INDEX idx_services_base_price_active ON services(base_price) WHERE active = true;
+CREATE INDEX idx_services_created_at_desc_active ON services(created_at DESC) WHERE active = true;
+CREATE INDEX idx_services_category_active_featured ON services(category, active, featured) WHERE active = true;
+
+-- Provider profiles indexes
+CREATE INDEX idx_provider_profiles_verified ON provider_profiles(verified);
+CREATE INDEX idx_provider_profiles_rating_average_desc ON provider_profiles(rating_average DESC);
+
+-- Full-text search support (Italian language)
+ALTER TABLE services ADD COLUMN IF NOT EXISTS search_vector tsvector;
+CREATE INDEX idx_services_search_vector ON services USING GIN(search_vector);
+
+-- Function to update search vector with weighted fields
+CREATE OR REPLACE FUNCTION update_services_search_vector()
+RETURNS trigger AS $$
+BEGIN
+  NEW.search_vector :=
+    setweight(to_tsvector('italian', COALESCE(NEW.title, '')), 'A') ||
+    setweight(to_tsvector('italian', COALESCE(NEW.description, '')), 'B') ||
+    setweight(to_tsvector('italian', COALESCE(NEW.subcategory, '')), 'C');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to automatically update search_vector
+CREATE TRIGGER services_search_vector_trigger
+  BEFORE INSERT OR UPDATE OF title, description, subcategory ON services
+  FOR EACH ROW
+  EXECUTE FUNCTION update_services_search_vector();
+
 -- Create updated_at triggers
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$

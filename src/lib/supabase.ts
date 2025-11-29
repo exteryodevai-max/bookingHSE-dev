@@ -107,14 +107,19 @@ export const db = {
   async getServices(filters: {
     category?: string;
     location?: { city?: string };
-    price_range?: { min: number; max: number };
+    price_range?: { min?: number; max?: number };
     rating_min?: number;
-    sort_by?: 'price_asc' | 'price_desc' | 'rating' | 'featured';
+    sort_by?: 'price_asc' | 'price_desc' | 'rating' | 'featured' | 'relevance';
     page?: number;
     limit?: number;
     provider_id?: string;
     search_query?: string;
     location_tokens?: string[];
+    // New filter parameters for F-1
+    service_type?: 'instant' | 'on_request';
+    languages?: string[];
+    certifications?: string[];
+    availability?: 'immediate' | 'this_week' | 'this_month';
   } = {}) {
     return withRetry(async () => {
       console.log('🔍 getServices chiamata con filtri:', filters);
@@ -137,7 +142,9 @@ export const db = {
               province,
               street,
               postal_code,
-              country
+              country,
+              languages,
+              certifications
             )
           )
         `)
@@ -181,8 +188,8 @@ export const db = {
 
       if (filters.price_range) {
         query = query
-          .gte('base_price', filters.price_range.min)
-          .lte('base_price', filters.price_range.max);
+          .gte('base_price', filters.price_range.min || 0)
+          .lte('base_price', filters.price_range.max || 999999);
       }
 
       if (filters.rating_min) {
@@ -191,6 +198,11 @@ export const db = {
 
       if (filters.provider_id) {
         query = query.eq('provider_id', filters.provider_id);
+      }
+
+      // Service type filter (instant vs on_request)
+      if (filters.service_type) {
+        query = query.eq('service_type', filters.service_type);
       }
 
       // Sorting
@@ -203,6 +215,9 @@ export const db = {
           break;
         case 'rating':
           query = query.order('provider.provider_profiles.rating_average', { ascending: false });
+          break;
+        case 'relevance':
+          query = query.order('featured', { ascending: false }).order('created_at', { ascending: false });
           break;
         default:
           query = query.order('featured', { ascending: false }).order('created_at', { ascending: false });
@@ -230,7 +245,7 @@ export const db = {
 
       
       // Transform data to match expected frontend structure
-      const transformedServices = (data || []).map(service => {
+      let transformedServices = (data || []).map(service => {
         console.log('🔍 DEBUG - Service raw data:', {
           service_id: service.id,
           service_title: service.title,
@@ -255,6 +270,8 @@ export const db = {
             rating_average: service.provider?.provider_profile?.rating_average || 0,
             reviews_count: service.provider?.provider_profile?.reviews_count || 0,
             verified: service.provider?.provider_profile?.verified || false,
+            languages: service.provider?.provider_profile?.languages || [],
+            certifications: service.provider?.provider_profile?.certifications || [],
             location: {
               city: service.provider?.provider_profile?.city || '',
               province: service.provider?.provider_profile?.province || '',
@@ -265,7 +282,36 @@ export const db = {
           }
         };
       });
-      
+
+      // Client-side filtering for languages
+      if (filters.languages && filters.languages.length > 0) {
+        transformedServices = transformedServices.filter(service => {
+          const providerLanguages = service.provider?.languages || [];
+          return filters.languages.some(lang => providerLanguages.includes(lang));
+        });
+      }
+
+      // Client-side filtering for certifications
+      if (filters.certifications && filters.certifications.length > 0) {
+        transformedServices = transformedServices.filter(service => {
+          const providerCerts = service.provider?.certifications || [];
+          return filters.certifications.some(cert => providerCerts.includes(cert));
+        });
+      }
+
+      // Client-side filtering for availability
+      if (filters.availability) {
+        transformedServices = transformedServices.filter(service => {
+          if (filters.availability === 'immediate') {
+            return service.service_type === 'instant';
+          }
+          if (filters.availability === 'this_week' || filters.availability === 'this_month') {
+            return service.service_type !== 'on_request' || service.active;
+          }
+          return true;
+        });
+      }
+
       console.log('✅ Servizi trasformati:', transformedServices.length);
       console.log('🎯 Risultato finale:', {
         services_count: transformedServices.length,

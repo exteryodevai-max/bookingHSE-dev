@@ -488,6 +488,52 @@ import { supabase } from '@lib/postgrest';
 > **Agenti: aggiornare questa sezione dopo ogni task completato**
 
 ### 2025-11-29
+- **[TASK F-1] Implementazione Filtri di Ricerca**
+  - Files modificati: `src/lib/supabase.ts`, `src/pages/Search.tsx`
+  - Aggiornato `db.getServices()` con nuovi parametri di filtro:
+    - `service_type`: 'instant' | 'on_request'
+    - `languages`: string[]
+    - `certifications`: string[]
+    - `availability`: 'immediate' | 'this_week' | 'this_month'
+  - Aggiunto filtro database per `service_type`
+  - Implementato filtro client-side per `languages` e `certifications`
+  - Aggiunto ordinamento per 'relevance' (featured + created_at)
+  - Aggiunto `languages` e `certifications` al select di provider_profiles
+
+- **[TASK F-4] Display Filtri Attivi con Chips**
+  - Files modificati: `src/components/Search/SearchResults.tsx`
+  - Aggiunto componente `ActiveFilterChips` per mostrare i filtri attivi
+  - Chips rimovibili per: prezzo, tipo servizio, rating, disponibilita, lingue, certificazioni
+  - Pulsante "Cancella tutto" per rimuovere tutti i filtri
+  - Aggiunto prop `onFiltersChange` a SearchResults per gestire rimozione filtri
+
+- **[TASK F-2] Fix Ricerca Geografica con service_areas**
+  - Files modificati: `src/pages/Search.tsx`
+  - Quando si usa la ricerca per coordinate (raggio), ora viene verificato che il provider offra servizi nella zona cercata
+  - Il filtro `service_areas` viene applicato anche alla ricerca geografica per coordinate
+
+### 2025-11-29
+- **[TASK B-1 & B-3] Aggiunti indici di ricerca e Full-Text Search**
+  - Migration: `supabase/migrations/20251129_search_indexes_and_fulltext.sql`
+  - Indici aggiunti su `services`:
+    - `idx_services_category_active` (partial index per categoria)
+    - `idx_services_base_price_active` (partial index per prezzo)
+    - `idx_services_created_at_desc_active` (partial index per data creazione)
+    - `idx_services_category_active_featured` (compound partial index)
+    - `idx_services_search_vector` (GIN index per full-text search)
+  - Indici aggiunti su `provider_profiles`:
+    - `idx_provider_profiles_verified`
+    - `idx_provider_profiles_rating_average_desc`
+  - Full-text search implementato:
+    - Colonna `search_vector` (tsvector) sulla tabella services
+    - Funzione `update_services_search_vector()` per aggiornamento automatico
+    - Trigger `services_search_vector_trigger` per INSERT/UPDATE
+    - Funzione helper `search_services_ranked()` per ricerche con ranking
+    - Configurazione lingua: Italian
+    - Pesi: A=title, B=description, C=subcategory
+  - Files modificati: `database/schema.sql`
+
+### 2025-11-29
 - **Rimosso campo website da ProviderProfile**
   - Files modificati: `ProviderDetailPage.tsx`, `ServiceDetail.tsx`, `Profile.tsx`, `AuthContext.tsx`, `types/index.ts`, `database.types.ts`
   - Migration: `ALTER TABLE provider_profiles DROP COLUMN IF EXISTS website`

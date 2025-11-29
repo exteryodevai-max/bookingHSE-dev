@@ -7,6 +7,7 @@ import {
   ClockIcon,
   CurrencyEuroIcon
 } from '@heroicons/react/24/solid';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import { ServiceSearchItem, SearchFilters } from '../../types';
 import { GeoSearchResult } from '../../lib/geoSearch';
 
@@ -138,6 +139,105 @@ const getPricingUnitLabel = (unit: string) => PRICING_UNIT_LABELS[unit] || '';
 const getAvailabilityLabel = (availability: string) => AVAILABILITY_LABELS[availability] || availability;
 const getAvailabilityColor = (availability: string) => AVAILABILITY_COLORS[availability] || 'bg-gray-100 text-gray-800';
 
+
+// Helper functions for filter chip labels
+const getPriceRangeLabel = (priceRange?: { min?: number; max?: number }) => {
+  if (!priceRange) return null;
+  if (priceRange.min && priceRange.max) return `€${priceRange.min} - €${priceRange.max}`;
+  if (priceRange.max) return `Fino a €${priceRange.max}`;
+  if (priceRange.min) return `Da €${priceRange.min}`;
+  return null;
+};
+
+const getServiceTypeLabel = (type?: string) => {
+  if (type === 'instant') return 'Prenotazione immediata';
+  if (type === 'on_request') return 'Su richiesta';
+  return null;
+};
+
+const getRatingLabel = (rating?: number) => {
+  return rating ? `${rating}+ stelle` : null;
+};
+
+const getAvailabilityLabel2 = (avail?: string) => {
+  switch (avail) {
+    case 'immediate': return 'Disponibile subito';
+    case 'this_week': return 'Questa settimana';
+    case 'this_month': return 'Questo mese';
+    default: return null;
+  }
+};
+
+// Active Filter Chips Component
+interface ActiveFilterChipsProps {
+  filters: SearchFilters;
+  onRemoveFilter: (filterKey: string, value?: string) => void;
+  onClearAll: () => void;
+}
+
+const ActiveFilterChips: React.FC<ActiveFilterChipsProps> = ({ filters, onRemoveFilter, onClearAll }) => {
+  const chips: { key: string; label: string; value?: string }[] = [];
+
+  // Price range
+  const priceLabel = getPriceRangeLabel(filters.price_range);
+  if (priceLabel) chips.push({ key: 'price_range', label: priceLabel });
+
+  // Service type
+  const serviceTypeLabel = getServiceTypeLabel(filters.service_type);
+  if (serviceTypeLabel) chips.push({ key: 'service_type', label: serviceTypeLabel });
+
+  // Rating
+  const ratingLabel = getRatingLabel(filters.rating_min);
+  if (ratingLabel) chips.push({ key: 'rating_min', label: ratingLabel });
+
+  // Availability
+  const availLabel = getAvailabilityLabel2(filters.availability);
+  if (availLabel) chips.push({ key: 'availability', label: availLabel });
+
+  // Languages
+  if (filters.languages && filters.languages.length > 0) {
+    filters.languages.forEach(lang => {
+      chips.push({ key: 'languages', label: lang, value: lang });
+    });
+  }
+
+  // Certifications
+  if (filters.certifications && filters.certifications.length > 0) {
+    filters.certifications.forEach(cert => {
+      chips.push({ key: 'certifications', label: cert, value: cert });
+    });
+  }
+
+  if (chips.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 mb-4">
+      <span className="text-sm text-gray-600 font-medium">Filtri attivi:</span>
+      {chips.map((chip, index) => (
+        <span
+          key={`${chip.key}-${chip.value || index}`}
+          className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+        >
+          {chip.label}
+          <button
+            onClick={() => onRemoveFilter(chip.key, chip.value)}
+            className="ml-1 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+            aria-label={`Rimuovi filtro ${chip.label}`}
+          >
+            <XMarkIcon className="h-4 w-4" />
+          </button>
+        </span>
+      ))}
+      <button
+        onClick={onClearAll}
+        className="text-sm text-blue-600 hover:text-blue-700 font-medium ml-2"
+      >
+        Cancella tutto
+      </button>
+    </div>
+  );
+};
+
 const SearchResults = memo(function SearchResults({
   results,
   totalCount,
@@ -218,6 +318,34 @@ const SearchResults = memo(function SearchResults({
           </div>
         )}
       </div>
+
+      {/* Active Filter Chips */}
+      {onFiltersChange && (
+        <ActiveFilterChips
+          filters={filters}
+          onRemoveFilter={(key, value) => {
+            if (key === 'languages' && value) {
+              const newLanguages = (filters.languages || []).filter(l => l !== value);
+              onFiltersChange({ languages: newLanguages.length > 0 ? newLanguages : undefined });
+            } else if (key === 'certifications' && value) {
+              const newCerts = (filters.certifications || []).filter(c => c !== value);
+              onFiltersChange({ certifications: newCerts.length > 0 ? newCerts : undefined });
+            } else {
+              onFiltersChange({ [key]: undefined });
+            }
+          }}
+          onClearAll={() => {
+            onFiltersChange({
+              price_range: undefined,
+              service_type: undefined,
+              rating_min: undefined,
+              availability: undefined,
+              languages: undefined,
+              certifications: undefined
+            });
+          }}
+        />
+      )}
 
       {/* Results List */}
       {results.length > 0 ? (

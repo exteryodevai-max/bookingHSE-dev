@@ -110,11 +110,31 @@ export default function Search() {
       const coordsValid = !!(filters.location?.coordinates && filters.location.coordinates.lat !== 0 && filters.location.coordinates.lng !== 0);
       if (coordsValid && providers.length > 0 && providersHaveCoords) {
         console.log('🌍 Search.tsx - Usando ricerca geografica');
-        const geoResults = GeoSearchService.filterByLocation(
+        let geoResults = GeoSearchService.filterByLocation(
           providers,
           filters.location.coordinates,
           filters.location.radius_km || 50
         );
+
+        // F-2: Filtra anche per service_areas se abbiamo una città cercata
+        if (filters.location?.city) {
+          const searchedLocation = filters.location.city.toLowerCase().trim();
+          const searchTokens = searchedLocation.split(',').map(t => t.trim()).filter(Boolean);
+
+          geoResults = geoResults.filter(result => {
+            const providerServiceAreas = (result.provider as any)?.provider_profile?.service_areas || [];
+            if (providerServiceAreas.length === 0) return true; // Se non ha aree definite, includi
+
+            // Verifica se almeno un token di ricerca è contenuto nelle service_areas
+            return searchTokens.some(token =>
+              providerServiceAreas.some((area: string) =>
+                area.toLowerCase().includes(token) || token.includes(area.toLowerCase())
+              )
+            );
+          });
+          console.log('📍 Search.tsx - Dopo filtro service_areas:', geoResults.length, 'risultati');
+        }
+
         if (requestId === requestIdRef.current) {
           setResults(geoResults);
           setTotalCount(geoResults.length);
@@ -427,6 +447,7 @@ export default function Search() {
                 filters={filters}
                 onPageChange={handlePageChange}
                 onSortChange={(sortBy) => handleFiltersChange({ sort_by: sortBy })}
+                onFiltersChange={handleFiltersChange}
                 showDistance={!!filters.location?.coordinates}
               />
             </div>
