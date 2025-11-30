@@ -14,19 +14,75 @@ npm run build        # Build produzione
 npm run lint         # Linting
 ```
 
-### SSH Tunnel (richiesto per API)
+### SSH Tunnel (richiesto per API dev)
 ```bash
 ssh -p 6001 -L 3000:127.0.0.1:3000 pierluigi@217.194.10.242
 ```
 
-### Database Connection
-```
-Host: 217.194.10.242 (o localhost via tunnel)
-Port: 5432
-Database: bookinghse_dev
-User: postgres
-Password: bookinghse2025
-```
+---
+
+## Ambienti: DEVELOPMENT vs PRODUCTION
+
+### Repository GitHub
+
+| Ambiente | Repository | URL |
+|----------|------------|-----|
+| **DEV** | `bookingHSE-dev` | https://github.com/exteryodevai-max/bookingHSE-dev.git |
+| **PROD** | `bookingHSE` | https://github.com/exteryodevai-max/bookingHSE.git |
+
+### Cartelle Locali
+
+| Ambiente | Path |
+|----------|------|
+| **DEV** | `C:/Users/patri/bookingHSE-dev` |
+| **PROD** | `C:/Users/patri/bookingHSE-prod` |
+
+### Database
+
+| Ambiente | Database | Host | Port | User | Password |
+|----------|----------|------|------|------|----------|
+| **DEV** | `bookinghse_dev` | 217.194.10.242 | 5432 | postgres | bookinghse2025 |
+| **PROD** | `bookinghse_db` | 217.194.10.242 | 5432 | postgres | bookinghse2025 |
+
+### PostgREST Configuration
+
+| Ambiente | Config File | Port | db-anon-role | db-schemas |
+|----------|-------------|------|--------------|------------|
+| **DEV** | `/etc/postgrest/dev.conf` | 3000 | `postgres` | `public` |
+| **PROD** | `/etc/postgrest/postgrest.conf` | 3000 | `anon` | `public, auth` |
+
+**IMPORTANTE**: Solo un PostgREST può girare alla volta sulla porta 3000!
+- Per DEV: `nohup postgrest /etc/postgrest/dev.conf > ~/postgrest.log 2>&1 &`
+- Per PROD: `sudo systemctl start postgrest` (usa postgrest.conf)
+
+### JWT Secrets (NON MODIFICARE!)
+
+| Ambiente | JWT Secret |
+|----------|------------|
+| **DEV** | `bookinghse-dev-jwt-secret-2025-min32chars` |
+| **PROD** | `your-super-secret-jwt-token-with-at-least-32-characters-long` |
+
+### API URLs
+
+| Ambiente | API URL | Frontend URL |
+|----------|---------|--------------|
+| **DEV** | `http://localhost:3000` (via SSH tunnel) | `http://localhost:5173` |
+| **PROD** | `https://bookinghse.exteryo.com` | Deploy via GitHub |
+
+### Environment Files
+
+| Ambiente | File | VITE_SUPABASE_URL |
+|----------|------|-------------------|
+| **DEV** | `.env.development` | `http://localhost:3000` |
+| **PROD** | `.env.production` | `https://bookinghse.exteryo.com` |
+
+### Processo di Deploy DEV → PROD
+
+1. **Database**: Applicare le stesse funzioni/migrazioni su `bookinghse_db`
+2. **PostgREST**: Riavviare il servizio prod (`sudo systemctl restart postgrest`)
+3. **Frontend**: Copiare file modificati da `bookingHSE-dev` a `bookingHSE-prod`
+4. **Git**: Commit e push su repo `bookingHSE` (prod)
+5. **Deploy**: Automatico via GitHub (CI/CD)
 
 ---
 
@@ -487,6 +543,106 @@ import { supabase } from '@lib/postgrest';
 
 > **Agenti: aggiornare questa sezione dopo ogni task completato**
 
+### 2025-11-30
+- **[BUGFIX] Fix PostgREST nested relations not working**
+  - File modificato: `src/lib/postgrest.ts`
+  - Problema: Le query con relazioni annidate (es. `provider:users(provider_profile:provider_profiles(...))`) non funzionavano
+  - Causa: La stringa `select` conteneva newline e spazi (formattazione codice) che PostgREST non interpretava
+  - Sintomo: `provider: undefined` nei risultati, "Fornitore non disponibile" mostrato
+  - Soluzione: Normalizzare la stringa select rimuovendo whitespace
+    ```typescript
+    const normalizedSelect = this.selectColumns.replace(/\s+/g, '').trim();
+    ```
+  - Ora le relazioni annidate funzionano correttamente
+
+- **[FEATURE] Cache versioning per invalidazione automatica**
+  - File modificato: `src/lib/cache/cacheManager.ts`
+  - Aggiunto sistema di versioning cache (`CACHE_VERSION = 'v3'`)
+  - All'avvio, se la versione cambia, la cache viene automaticamente pulita
+  - Previene problemi con dati cached con struttura obsoleta
+
+- **[BUGFIX] Fix ricerca per località (input manuale)**
+  - File modificato: `src/components/Map/LocationPicker.tsx`
+  - Problema: La ricerca non funzionava quando l'utente digitava manualmente senza selezionare un suggerimento
+  - Soluzione: `onChange` viene chiamato durante la digitazione con `coordinates: undefined`
+  - La ricerca ora funziona sia con suggerimenti selezionati che con input manuale
+
+- **[DEPLOY] Migrazione DEV → PROD completata**
+  - **Database PROD** (`bookinghse_db`):
+    - Creata funzione `archive_service(uuid, uuid)` RPC
+    - Creata funzione `restore_service(uuid, uuid)` RPC
+    - Creati 8 indici di performance per ricerca
+    - PostgREST ricaricato: 46 Functions
+  - **Frontend PROD** (GitHub `bookingHSE`):
+    - `src/lib/postgrest.ts` - Metodi `not()` e `is()`
+    - `src/lib/supabase.ts` - Filtro location client-side
+    - `src/components/Search/SearchResults.tsx` - ActiveFilterChips
+    - `src/pages/Info/ForProvidersPage.tsx` - Commissione "Custom"
+  - **Commit**: `dd6ca38` su branch `main`
+  - **Nota**: JWT secrets NON modificati, ogni ambiente usa il proprio
+
+- **[FEATURE] Aggiunta documentazione ambienti DEV/PROD in CLAUDE.md**
+  - Sezione "Ambienti: DEVELOPMENT vs PRODUCTION" con tabelle comparative
+  - Repository GitHub, Database, PostgREST config, JWT secrets, API URLs
+  - Processo di deploy step-by-step
+
+- **[FEATURE] Create restore_service RPC function for archived services**
+  - File SQL: `/tmp/restore_service.sql` (eseguito sul server)
+  - Problema: La funzione `restore_service` non esisteva. Il frontend la chiamava ma riceveva 404
+  - Funzione: `public.restore_service(p_service_id uuid, p_user_id uuid) RETURNS boolean`
+  - Funzionalita:
+    1. Verifica che il servizio archiviato esista e appartenga all'utente
+    2. Recupera i metadati salvati (subcategory, service_type, pricing_unit, etc.)
+    3. Reinserisce il servizio nella tabella `services` con `active = true`
+    4. Elimina il record dalla tabella `archived_services`
+  - PostgREST ricaricato: 35 Functions (prima erano 34)
+  - Permessi: GRANT EXECUTE a `anon` e `authenticated`
+
+- **[BUGFIX] Fix query.not is not a function in ProviderServicesPage**
+  - File modificato: `src/lib/postgrest.ts`
+  - Problema: Il QueryBuilder custom non aveva il metodo `not()` richiesto da Supabase API
+  - Errore: `TypeError: query.not is not a function` at `ProviderServicesPage.tsx:79`
+  - Soluzione: Aggiunti i metodi `not()` e `is()` al QueryBuilder
+  - Metodo `not(column, operator, value)`: genera filtro PostgREST `column=not.operator.value`
+  - Metodo `is(column, value)`: genera filtro PostgREST `column=is.value`
+
+- **[BUGFIX] Fix archive_service RPC function - function creation**
+  - File SQL: `/tmp/archive_service.sql` (eseguito sul server)
+  - Problema: La funzione `archive_service` non esisteva nel database. Esisteva solo `archive_service_function` che era un trigger function (RETURNS trigger), non una RPC function callable da PostgREST
+  - Frontend chiamava: `/rpc/archive_service` con parametri `p_service_id` e `p_user_id`
+  - Errore: 404 Not Found perché PostgREST non trovava la funzione con quella signature
+  - Soluzione:
+    1. Droppato il trigger `archive_service ON services` (conflitto di nome)
+    2. Creato nuova funzione `public.archive_service(p_service_id uuid, p_user_id uuid) RETURNS boolean`
+    3. La funzione copia il servizio in `archived_services` e lo elimina da `services`
+    4. Cast espliciti `::text` per enum e jsonb
+    5. GRANT EXECUTE a `anon` e `authenticated`
+  - PostgREST ricaricato: 34 Functions (prima erano 33)
+  - Test: `/rpc/archive_service` ora risponde correttamente
+
+- **[BUGFIX] Fix location search - client-side filtering**
+  - File modificato: `src/lib/supabase.ts`
+  - Problema: Gli operatori PostgREST per array (`cs`, `ov`) non funzionano con il nostro client custom
+  - Errori: `invalid input syntax for type json` e `operator does not exist: jsonb && unknown`
+  - Soluzione finale: **Filtro location eseguito client-side**
+    1. Query base senza filtro location (recupera tutti i servizi attivi)
+    2. Dopo la trasformazione dati, filtro `service_areas_lower` lato client
+    3. `locationTokens.some(token => serviceAreas.includes(token))`
+  - Nota: Per dataset piccoli questa soluzione è accettabile. Per grandi volumi, considerare RPC function PostgreSQL
+
+- **[BUGFIX] Fix onFiltersChange not defined in SearchResults**
+  - File modificato: `src/components/Search/SearchResults.tsx`
+  - Aggiunto `onFiltersChange?: (filters: Partial<SearchFilters>) => void;` all'interface `SearchResultsProps`
+  - Aggiunto `onFiltersChange` alla destructuring dei props nel componente
+  - Causa: Il task F-4 aveva aggiunto codice che usava `onFiltersChange` ma aveva dimenticato di dichiararlo nell'interface e nei props
+
+- **[BUGFIX] Fix PostgREST array contains syntax for service_areas**
+  - File modificato: `src/lib/supabase.ts`
+  - Corretto il filtro `service_areas_lower.cs.{}` per usare elementi quotati: `cs.{"value"}`
+  - PostgREST richiede double quotes intorno agli elementi dell'array nella sintassi `cs`
+  - Semplificato il codice: rimosso il loop sulle varianti di case, ora si usa sempre `service_areas_lower` con lowercase
+  - Errore originale: `invalid input syntax for type json` perchè PostgREST interpretava `{milano}` come JSON invalido
+
 ### 2025-11-29
 - **[TASK F-1] Implementazione Filtri di Ricerca**
   - Files modificati: `src/lib/supabase.ts`, `src/pages/Search.tsx`
@@ -558,6 +714,14 @@ import { supabase } from '@lib/postgrest';
 
 ## 15. Contatti Sviluppo
 
-- Repository: `bookingHSE-dev`
-- Server: 217.194.10.242 (porta SSH: 6001)
-- Database dev: `bookinghse_dev`
+- **Server**: 217.194.10.242 (porta SSH: 6001)
+- **User SSH**: pierluigi
+- **Password SSH**: f3lA5Z65Q844
+
+### Repository GitHub
+- **DEV**: https://github.com/exteryodevai-max/bookingHSE-dev.git
+- **PROD**: https://github.com/exteryodevai-max/bookingHSE.git
+
+### Database
+- **DEV**: `bookinghse_dev`
+- **PROD**: `bookinghse_db`

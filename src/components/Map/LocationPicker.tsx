@@ -14,7 +14,7 @@ export interface LocationPickerProps {
   };
   onChange: (location: {
     address: string;
-    coordinates: {
+    coordinates?: {
       lat: number;
       lng: number;
     };
@@ -97,13 +97,20 @@ export default function LocationPicker({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setInputValue(newValue);
-    
+
+    // Notifica il parent del valore digitato (anche senza coordinate)
+    // Questo permette di cercare per nome città senza selezionare un suggerimento
+    onChange({
+      address: newValue,
+      coordinates: undefined
+    });
+
     // Cancella il timeout precedente
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
-    
-    // Imposta un nuovo timeout per la ricerca
+
+    // Imposta un nuovo timeout per la ricerca suggerimenti
     searchTimeoutRef.current = setTimeout(() => {
       handleSearch(newValue);
     }, 300);

@@ -143,8 +143,7 @@ export const db = {
               street,
               postal_code,
               country,
-              languages,
-              certifications
+              languages
             )
           )
         `)
@@ -157,33 +156,31 @@ export const db = {
         query = query.eq('category', filters.category);
       }
 
-      const orConditions: string[] = [];
+      // Build search conditions for text search (title, description, subcategory)
+      const searchOrConditions: string[] = [];
       if (filters.search_query) {
         const searchTerm = filters.search_query.toLowerCase().trim();
-        orConditions.push(
+        searchOrConditions.push(
           `title.ilike.%${searchTerm}%`,
           `description.ilike.%${searchTerm}%`,
           `subcategory.ilike.%${searchTerm}%`
         );
       }
 
-      if (filters.location_tokens && filters.location_tokens.length > 0) {
-        filters.location_tokens.forEach(tok => {
-          orConditions.push(`service_areas_lower.cs.{${tok}}`);
-        });
-      } else if (filters.location?.city) {
-        const cityRaw = (filters.location.city || '').trim();
-        const tokens = cityRaw.split(',').map(t => t.trim()).filter(Boolean);
-        const variants = (s: string) => [s, s.toLowerCase(), s.toUpperCase(), s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()];
-        tokens.forEach(tok => {
-          variants(tok).forEach(v => {
-            orConditions.push(`service_areas.cs.{${v}}`);
-          });
-        });
+      // Apply text search conditions
+      if (searchOrConditions.length > 0) {
+        query = query.or(searchOrConditions.join(','));
       }
 
-      if (orConditions.length > 0) {
-        query = query.or(orConditions.join(','));
+      // Build location filter tokens for client-side filtering
+      // PostgREST array operators (cs, ov) have issues with our custom client
+      // Solution: Filter client-side after fetching results
+      let locationTokens: string[] = [];
+      if (filters.location_tokens && filters.location_tokens.length > 0) {
+        locationTokens = filters.location_tokens.map(tok => tok.toLowerCase());
+      } else if (filters.location?.city) {
+        const cityRaw = (filters.location.city || '').trim();
+        locationTokens = cityRaw.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
       }
 
       if (filters.price_range) {
@@ -232,11 +229,10 @@ export const db = {
       // Esegui la query per i dati con paginazione
       const { data, error } = await query.range(from, to);
       
-      console.log('📋 Risultati query Supabase:', { 
-        data: data?.length || 0, 
+      console.log('📋 Risultati query Supabase:', {
+        data: data?.length || 0,
         error: error?.message || 'nessun errore'
       });
-      console.log('📝 Servizi trovati:', data);
       
       if (error) {
         const parsedError = parseSupabaseError(error, 'Ricerca servizi');
@@ -246,16 +242,13 @@ export const db = {
       
       // Transform data to match expected frontend structure
       let transformedServices = (data || []).map(service => {
-        console.log('🔍 DEBUG - Service raw data:', {
-          service_id: service.id,
-          service_title: service.title,
-          provider_data: service.provider,
-          provider_profile: service.provider?.provider_profile
-        });
-        
-        const businessName = service.provider?.provider_profile?.business_name;
-        console.log('🏢 DEBUG - Business name extracted:', businessName);
-        
+        // PostgREST returns provider_profile as array, get first element
+        const providerProfile = Array.isArray(service.provider?.provider_profile)
+          ? service.provider.provider_profile[0]
+          : service.provider?.provider_profile;
+
+        const businessName = providerProfile?.business_name;
+
         return {
           ...service,
           pricing: {
@@ -267,21 +260,34 @@ export const db = {
           provider: {
             id: service.provider?.id || service.provider_id,
             business_name: businessName || 'Fornitore non disponibile',
-            rating_average: service.provider?.provider_profile?.rating_average || 0,
-            reviews_count: service.provider?.provider_profile?.reviews_count || 0,
-            verified: service.provider?.provider_profile?.verified || false,
-            languages: service.provider?.provider_profile?.languages || [],
-            certifications: service.provider?.provider_profile?.certifications || [],
+            rating_average: providerProfile?.rating_average || 0,
+            reviews_count: providerProfile?.reviews_count || 0,
+            verified: providerProfile?.verified || false,
+            languages: providerProfile?.languages || [],
             location: {
-              city: service.provider?.provider_profile?.city || '',
-              province: service.provider?.provider_profile?.province || '',
-              street: service.provider?.provider_profile?.street || '',
-              postal_code: service.provider?.provider_profile?.postal_code || '',
-              country: service.provider?.provider_profile?.country || '',
+              city: providerProfile?.city || '',
+              province: providerProfile?.province || '',
+              street: providerProfile?.street || '',
+              postal_code: providerProfile?.postal_code || '',
+              country: providerProfile?.country || '',
             },
           }
         };
       });
+
+      // Client-side filtering for location (service_areas_lower)
+      // PostgREST array operators don't work well with our custom client
+      if (locationTokens.length > 0) {
+        console.log('🌍 Filtrando per location tokens:', locationTokens);
+        console.log('📦 Servizi prima del filtro location:', transformedServices.length);
+        transformedServices = transformedServices.filter(service => {
+          const serviceAreas = (service as any).service_areas_lower || [];
+          const matches = locationTokens.some(token => serviceAreas.includes(token));
+          console.log(`  - Servizio "${service.title}" service_areas_lower:`, serviceAreas, '=> match:', matches);
+          return matches;
+        });
+        console.log('📦 Servizi dopo filtro location:', transformedServices.length);
+      }
 
       // Client-side filtering for languages
       if (filters.languages && filters.languages.length > 0) {
@@ -291,13 +297,13 @@ export const db = {
         });
       }
 
-      // Client-side filtering for certifications
-      if (filters.certifications && filters.certifications.length > 0) {
-        transformedServices = transformedServices.filter(service => {
-          const providerCerts = service.provider?.certifications || [];
-          return filters.certifications.some(cert => providerCerts.includes(cert));
-        });
-      }
+      // Client-side filtering for certifications (disabilitato - colonna non presente in DEV)
+      // if (filters.certifications && filters.certifications.length > 0) {
+      //   transformedServices = transformedServices.filter(service => {
+      //     const providerCerts = service.provider?.certifications || [];
+      //     return filters.certifications.some(cert => providerCerts.includes(cert));
+      //   });
+      // }
 
       // Client-side filtering for availability
       if (filters.availability) {
@@ -313,12 +319,6 @@ export const db = {
       }
 
       console.log('✅ Servizi trasformati:', transformedServices.length);
-      console.log('🎯 Risultato finale:', {
-        services_count: transformedServices.length,
-        total_count: transformedServices.length,
-        page,
-        limit
-      });
       
       return {
         services: transformedServices,

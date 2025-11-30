@@ -13,7 +13,8 @@ import {
   ClockIcon,
   XCircleIcon,
   ArchiveBoxIcon,
-  DocumentArrowUpIcon
+  DocumentArrowUpIcon,
+  UsersIcon
 } from '@heroicons/react/24/outline';
 import Layout from '../components/Layout/Layout';
 import { useAuth } from '../contexts/AuthContext';
@@ -415,6 +416,13 @@ export default function Dashboard() {
                     >
                       <DocumentArrowUpIcon className="h-5 w-5 text-indigo-600 mr-3" />
                       <span className="font-medium text-gray-900">Caricamento Servizi</span>
+                    </Link>
+                    <Link
+                      to="/provider/users"
+                      className="flex items-center w-full text-left p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <UsersIcon className="h-5 w-5 text-teal-600 mr-3" />
+                      <span className="font-medium text-gray-900">Gestione Utenti</span>
                     </Link>
                   </>
                 )}

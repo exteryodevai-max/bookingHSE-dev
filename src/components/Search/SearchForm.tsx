@@ -24,9 +24,12 @@ const SERVICE_CATEGORIES = [
 
 const SearchForm = memo(function SearchForm({ initialFilters, onFiltersChange, onSearch }: SearchFormProps) {
   const [query, setQuery] = useState(initialFilters.query || '');
-  const [location, setLocation] = useState({
-    address: initialFilters.location.city || '',
-    coordinates: initialFilters.location.coordinates
+  const [location, setLocation] = useState<{
+    address: string;
+    coordinates?: { lat: number; lng: number };
+  }>({
+    address: initialFilters.location?.city || '',
+    coordinates: initialFilters.location?.coordinates
   });
   const [category, setCategory] = useState(initialFilters.category || '');
 

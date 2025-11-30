@@ -185,7 +185,7 @@ export default function ForProvidersPage() {
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-200">
                     <span className="text-gray-600">Commissione per prenotazione</span>
-                    <span className="font-semibold text-blue-600">Solo 5%</span>
+                    <span className="font-semibold text-blue-600">Custom</span>
                   </div>
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-600">Supporto clienti</span>

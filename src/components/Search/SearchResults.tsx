@@ -78,6 +78,7 @@ interface SearchResultsProps {
   filters: SearchFilters;
   onPageChange: (page: number) => void;
   onSortChange: (sortBy: string) => void;
+  onFiltersChange?: (filters: Partial<SearchFilters>) => void;
   showDistance?: boolean;
 }
 
@@ -245,7 +246,8 @@ const SearchResults = memo(function SearchResults({
   loading,
   filters,
   onPageChange,
-  onSortChange
+  onSortChange,
+  onFiltersChange
 }: SearchResultsProps) {
   const hasCoordinates = !!filters.location?.coordinates;
   const isServiceItem = (item: ServiceSearchItem | GeoSearchResult): item is ServiceSearchItem => {

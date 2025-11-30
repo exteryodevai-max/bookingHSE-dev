@@ -44,6 +44,9 @@ import ProviderServicesPage from './pages/Services/ProviderServicesPage';
 import EditServicePage from './pages/Services/EditServicePage';
 import BulkImportPage from './pages/Services/BulkImportPage';
 
+// Provider Pages
+import UserManagementPage from './pages/provider/UserManagementPage';
+
 // Legal Pages
 import TermsPage from './pages/Legal/TermsPage';
 import PrivacyPage from './pages/Legal/PrivacyPage';
@@ -182,6 +185,11 @@ const router = createBrowserRouter([
       {
         path: 'provider/profile',
         element: <ProtectedRoute><Profile /></ProtectedRoute>
+      },
+      // Provider User Management
+      {
+        path: 'provider/users',
+        element: <ProtectedRoute requiresUserType="provider"><UserManagementPage /></ProtectedRoute>
       },
       // Bookings
       {

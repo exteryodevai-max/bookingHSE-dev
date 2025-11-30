@@ -151,6 +151,18 @@ class QueryBuilder<T = unknown> {
     return this;
   }
 
+  not(column: string, operator: string, value: unknown): this {
+    // PostgREST syntax for NOT: column=not.operator.value
+    // Example: id=not.is.null
+    this.filters.push(`${column}=not.${operator}.${encodeURIComponent(String(value))}`);
+    return this;
+  }
+
+  is(column: string, value: 'null' | 'true' | 'false'): this {
+    this.filters.push(`${column}=is.${value}`);
+    return this;
+  }
+
   order(column: string, options: { ascending?: boolean } = {}): this {
     const direction = options.ascending === false ? 'desc' : 'asc';
     this.orderBy.push(`${column}.${direction}`);
@@ -184,7 +196,12 @@ class QueryBuilder<T = unknown> {
     const params: string[] = [];
 
     if (this.selectColumns !== '*') {
-      params.push(`select=${encodeURIComponent(this.selectColumns)}`);
+      // Normalize select string: remove newlines and extra whitespace
+      // PostgREST expects compact select without extra whitespace
+      const normalizedSelect = this.selectColumns
+        .replace(/\s+/g, '') // Remove all whitespace
+        .trim();
+      params.push(`select=${encodeURIComponent(normalizedSelect)}`);
     }
 
     params.push(...this.filters);

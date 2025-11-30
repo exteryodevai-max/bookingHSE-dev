@@ -92,7 +92,7 @@ export default function Search() {
       console.log('🔍 Search.tsx - Inizio ricerca con filtri:', filters);
       
       const cacheKey = getSearchCacheKey(filters);
-      
+
       // Controlla se i risultati sono già in cache
       const cachedResults = globalCache.get(cacheKey);
       if (cachedResults && !filters.location?.coordinates) {
@@ -144,11 +144,14 @@ export default function Search() {
         const locationTokens: string[] = [];
         if (filters.location?.city) {
           const loc = filters.location.city.trim();
+          console.log('🔍 Location input:', loc, '-> lowercase:', loc.toLowerCase());
           if (isRegionName(loc)) {
             locationTokens.push(loc.toLowerCase());
             getRegionCapitals(loc).forEach(c => locationTokens.push(c.toLowerCase()));
+            console.log('📍 È una regione, aggiunti capoluoghi:', locationTokens);
           } else {
             locationTokens.push(loc.toLowerCase());
+            console.log('📍 Non è una regione, token:', locationTokens);
           }
         }
         const searchFilters = {
@@ -162,10 +165,10 @@ export default function Search() {
           services_count: searchResults.services?.length || 0,
           total_count: searchResults.total_count,
           search_query: filters.query,
-          services: searchResults.services
         });
         
         // Transform results to match SearchResult interface
+        // I dati da db.getServices() sono già trasformati con provider.business_name, provider.location, etc.
         let transformedResults: ServiceSearchItem[] = searchResults.services.map((service: Record<string, unknown>) => ({
           id: service.id,
           title: service.title,
@@ -173,19 +176,19 @@ export default function Search() {
           subcategory: service.subcategory,
           provider: {
             id: service.provider?.id || service.provider_id || '',
-            business_name: service.provider?.provider_profile?.business_name || service.provider?.business_name || 'Fornitore non disponibile',
-            rating_average: service.provider?.provider_profile?.rating_average || service.provider?.rating_average || 0,
-            reviews_count: service.provider?.provider_profile?.reviews_count || service.provider?.reviews_count || 0,
-            verified: service.provider?.provider_profile?.verified || service.provider?.verified || false,
+            business_name: service.provider?.business_name || 'Fornitore non disponibile',
+            rating_average: service.provider?.rating_average || 0,
+            reviews_count: service.provider?.reviews_count || 0,
+            verified: service.provider?.verified || false,
             location: {
-              city: service.provider?.provider_profile?.city || service.provider?.location?.city || '',
-              province: service.provider?.provider_profile?.province || service.provider?.location?.province || '',
+              city: service.provider?.location?.city || '',
+              province: service.provider?.location?.province || '',
             },
           },
           pricing: {
-            base_price: service.pricing?.base_price || service.base_price || 0,
-            pricing_unit: service.pricing?.pricing_unit || service.pricing_unit || 'fixed',
-            currency: service.pricing?.currency || service.currency || 'EUR',
+            base_price: service.pricing?.base_price || 0,
+            pricing_unit: service.pricing?.pricing_unit || 'fixed',
+            currency: service.pricing?.currency || 'EUR',
           },
           availability: service.service_type === 'instant' ? 'immediate' : service.availability || 'on_request',
           featured: service.featured,
@@ -201,13 +204,11 @@ export default function Search() {
             (s.provider.business_name || '').toLowerCase().includes(q)
           );
         }
+        // NOTA: Il filtro per location (service_areas) è già applicato in db.getServices()
+        // tramite locationTokens, quindi non serve filtrare nuovamente qui per provider.location
+        // Manteniamo solo l'ordinamento per rilevanza geografica
         if (filters.location?.city) {
           const city = filters.location.city.toLowerCase();
-          transformedResults = transformedResults.filter(s => {
-            const provCity = (s.provider.location.city || '').toLowerCase();
-            const provProv = (s.provider.location.province || '').toLowerCase();
-            return provCity.includes(city) || provProv.includes(city);
-          });
           const caps = isRegionName(filters.location.city) ? getRegionCapitals(filters.location.city).map(c => c.toLowerCase()) : [];
           transformedResults = transformedResults.sort((a, b) => {
             const score = (s: ServiceSearchItem) => {
@@ -226,54 +227,10 @@ export default function Search() {
           first_service: transformedResults[0]
         });
 
-        // Fallback: se la ricerca con località non trova nulla, riprova senza località e filtra client-side
-        if (filters.location?.city && (searchResults.total_count === 0 || transformedResults.length === 0)) {
-          const searchNoLocation = await db.getServices({
-            ...filters,
-            location: { ...filters.location, city: undefined },
-            search_query: filters.query
-          });
-          let fallbackResults: ServiceSearchItem[] = searchNoLocation.services.map((service: Record<string, unknown>) => ({
-            id: service.id,
-            title: service.title,
-            category: service.category,
-            subcategory: service.subcategory,
-            provider: {
-              id: service.provider?.id || service.provider_id || '',
-              business_name: service.provider?.provider_profile?.business_name || service.provider?.business_name || 'Fornitore non disponibile',
-              rating_average: service.provider?.provider_profile?.rating_average || service.provider?.rating_average || 0,
-              reviews_count: service.provider?.provider_profile?.reviews_count || service.provider?.reviews_count || 0,
-              verified: service.provider?.provider_profile?.verified || service.provider?.verified || false,
-              location: {
-                city: service.provider?.provider_profile?.city || service.provider?.location?.city || '',
-                province: service.provider?.provider_profile?.province || service.provider?.location?.province || '',
-              },
-            },
-            pricing: {
-              base_price: service.pricing?.base_price || service.base_price || 0,
-              pricing_unit: service.pricing?.pricing_unit || service.pricing_unit || 'fixed',
-              currency: service.pricing?.currency || service.currency || 'EUR',
-            },
-            availability: service.service_type === 'instant' ? 'immediate' : service.availability || 'on_request',
-            featured: service.featured,
-            images: service.images || [],
-            tags: service.tags || [],
-          }));
-          const city = filters.location.city.toLowerCase();
-          fallbackResults = fallbackResults.filter(s => {
-            const provCity = (s.provider.location.city || '').toLowerCase();
-            const provProv = (s.provider.location.province || '').toLowerCase();
-            return provCity.includes(city) || provProv.includes(city);
-          });
-          if (requestId === requestIdRef.current) {
-            setResults(fallbackResults);
-            setTotalCount(fallbackResults.length);
-          }
-        } else {
-          if (requestId === requestIdRef.current) {
-            setResults(transformedResults);
-            setTotalCount(transformedResults.length);
-          }
+        // Imposta i risultati
+        if (requestId === requestIdRef.current) {
+          setResults(transformedResults);
+          setTotalCount(transformedResults.length);
         }
         
         // Salva i risultati in cache (solo per ricerche non geografiche)

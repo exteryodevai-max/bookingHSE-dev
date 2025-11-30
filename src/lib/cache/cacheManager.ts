@@ -254,6 +254,37 @@ export const globalCache = new CacheManager({
   persist: true
 });
 
+// Cache version - increment this when data structure changes to invalidate old cache
+const CACHE_VERSION = 'v3';
+
+// Clear old cache on app start
+const CACHE_VERSION_KEY = 'cache_version';
+if (typeof window !== 'undefined') {
+  const storedVersion = localStorage.getItem(CACHE_VERSION_KEY);
+  if (storedVersion !== CACHE_VERSION) {
+    console.log('🗑️ Cache version changed from', storedVersion, 'to', CACHE_VERSION, '- clearing all cache...');
+
+    // Clear the globalCache instance (both memory and localStorage)
+    globalCache.clear();
+
+    // Also clear any orphaned localStorage items
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('search_results') || key.includes('providers_list'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => {
+      console.log('  Removing orphaned key:', key);
+      localStorage.removeItem(key);
+    });
+
+    localStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION);
+    console.log('✅ Cache cleared, new version set:', CACHE_VERSION);
+  }
+}
+
 export const CACHE_KEYS = {
   USER_PROFILE: 'user_profile',
   SESSION_DATA: 'session_data',
@@ -263,8 +294,8 @@ export const CACHE_KEYS = {
   PROVIDER_PROFILE: (providerId: string) => `provider_profile_${providerId}`,
   SERVICES_STATS: 'services_stats',
   CATEGORIES: 'categories',
-  SEARCH_RESULTS: 'search_results',
-  PROVIDERS_LIST: 'providers_list'
+  SEARCH_RESULTS: `search_results_${CACHE_VERSION}`,
+  PROVIDERS_LIST: `providers_list_${CACHE_VERSION}`
 } as const;
 
 export const CACHE_TTL = 30 * 60 * 1000; // 30 minutes in milliseconds
